@@ -37,12 +37,15 @@ $cacheFileDir = './cache/'; // directory for cache files
 $ourTZ = 'America/Los_Angeles'; // Timezone for display
 $timeFormat = 'M d h:ia T';  // Jan 05 09:58am PST
 #--------------------------------------------------------------------------------
+```
 
 Note that NWS-regional-radar-animate.php DOES NOT access Settings.php in the Saratoga Template (to increase
 speed with some Plugin configurations), so as a minimum, you should change
+
 ```
 $ourTZ = 'America/Los_Angeles'; // Timezone for display
 ```
+
 to your website's timezone spec (same as used in Settings.php $SITE['tz']) for
 proper display of 'local' time on the animated GIF.
 
@@ -53,12 +56,15 @@ in case the map displayed is not quite what you had in mind.
 
 For example, the $SITE['NWSregion'] = 'sw' (old designation) actually uses the 'las' (Las Vegas)
 view, which doesn't display Central California/Bay Area well, so I prefer using
+
 ```
 $SITE['NWSregion'] = 'wmc'; (Winnemucca, NV) for my default site.
 ```
+
 The region-info.pdf file shows the old v.s. new regions offered by aviationweather.gov site.
 
 Here are the new designations available:
+
 ```
   'us' => 'Contiguous US|useradar',
   'lws' => 'LWS: Lewiston, ID sector|useradar',
