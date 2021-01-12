@@ -7,6 +7,7 @@
 # Author:  Ken True - saratoga-weather.org
 #
 # Version 1.00 - 06-Jan-2020 - initial release
+# Version 1.01 - 12-Jan-2020 - fix issue with empty ?region= argument and last-modified 
 #
 # Usage:
 #   Change $NWSregion and $NWStype below to prefered settings.
@@ -58,7 +59,7 @@ $timeFormat = 'M d h:ia T';  // Jan 05 09:58am PST
 
 #--------------------------------------------------------------------------------
 # Constants -- don't change these
-$Version = "NWS-regional-radar-animate.php - V1.00 - 06-Jan-2021";
+$Version = "NWS-regional-radar-animate.php - V1.01 - 12-Jan-2021";
 
 $imgURL = 'https://www.aviationweather.gov';
 $queryURL = 'https://www.aviationweather.gov/radar/plot?region=%s&type=%s&date=';
@@ -153,9 +154,9 @@ $Status = "<!-- $Version -->\n";
 
 date_default_timezone_set($ourTZ);
 
-if(isset($_REQUEST['region'])) {$NWSregion = preg_replace('![^a-z]+!','',$_REQUEST['region']); }
+if(isset($_REQUEST['region']) and strlen($_REQUEST['region']) > 0) {$NWSregion = preg_replace('![^a-z]+!','',$_REQUEST['region']); }
 
-if(isset($_REQUEST['type'])) {$NWStype = preg_replace('![^a-z|\-|0-9]+!','',$_REQUEST['type']); }
+if(isset($_REQUEST['type']) and strlen($_REQUEST['type']) > 0) {$NWStype = preg_replace('![^a-z|\-|0-9]+!','',$_REQUEST['type']); }
 
 if(isset($oldRegions[$NWSregion])) {
 	$Status .= "<!-- NWSregion = '$NWSregion' changed to ";
@@ -175,13 +176,12 @@ if(!isset($validTypes[$NWStype])) {
 	exit(0);
 }
 
-if (isset($_REQUEST['cache']) && (strtolower($_REQUEST['cache']) == 'no') ) {
+if (isset($_REQUEST['cache']) and (strtolower($_REQUEST['cache']) == 'no') or
+    isset($_REQUEST['force']) and (strtolower($_REQUEST['force']) == '1') ) {
   $forceRefresh = true;
 } else {
   $forceRefresh = false;
 }
-
-$reloadImages = false;  // assume we don't have to reload unless a newer image set is around
 
 $mainURL = sprintf($queryURL,$NWSregion,$NWStype);
 $Status .= "<!-- using '$mainURL' for query -->\n";
@@ -266,7 +266,7 @@ if(file_exists($latestTimeFile) and file_exists($output) and ! $forceRefresh) {
 	$savedFileTime = file_get_contents($latestTimeFile);
 	if($latestImage == $savedFileTime) { //use cached version
 	   header('Content-type: image/gif');
-		 header('Last-modified: '.gmdate('r',filemtime($output)) );
+		 header('Last-modified: '.gmdate('r',NWSRA_get_time($savedFileTime)) );
 		 readfile($output);
 		 exit(0);
 	}
@@ -297,13 +297,26 @@ if($forceRefresh) {
 	
   for ($i=0;$i<$numimages;$i++) {
 		$imgFile = $cacheFileDir . 'NWS-'.$NWSregion.'-'.$NWStype.$i.'.gif';
-			
-	$frames[] = $imgFile;
-	$framed[] = $delay;
+		if(file_exists($imgFile) and filesize($imgFile) > 100) {	
+	    $frames[] = file_get_contents($imgFile);
+	    $framed[] = $delay;
+		}
   }
   $framed[$numimages-1] = $delay*3; # pause 3x at last frame
   
-	# $Status .= "<!-- frames\n".var_export($frames,true)." -->\n";
+	#  $Status .= "<!-- frames\n".var_export($frames,true)." -->\n";
+	/*
+	foreach ($frames as $i => $fname) {
+		if(file_exists($fname)) {
+			$tfile = 'true';
+			$tsize = filesize($fname);
+		} else {
+			$tfile = 'FALSE';
+			$tsize = 'n/a';
+		}
+		$Status .= "<!-- cached file '$fname' exists=$tfile size=$tsize -->\n";
+	}
+	*/	
 	# $Status .= "<!-- framed\n".var_export($framed,true)." -->\n";
   /*
 		  GIFEncoder constructor:
@@ -325,7 +338,7 @@ if($forceRefresh) {
 							  0,
 							  2,
 							  0, 0, 0,
-							  "url"
+							  "bin"
 		  );
   /*
 		  Possibles outputs:
@@ -351,7 +364,7 @@ if($forceRefresh) {
   $Status .= "<!-- Animated GIF processing completed for $output in $elapsed seconds. -->\n\n";  
 
   header('Content-type: image/gif');
-	header('Last-modified: '.gmdate('r',filemtime($output)) );
+	header('Last-modified: '.gmdate('r',NWSRA_get_time($latestImage)) );
 	readfile($output);
 
   log_status($logFile);
@@ -361,6 +374,24 @@ if($forceRefresh) {
 #-----------------------------------------------------------------------
 #  Functions
 #-----------------------------------------------------------------------
+
+function NWSRA_get_time($nwsImageFile) {
+	global $Status;
+#	/data/obs/radar/20210112/16/20210112_1638_rad_rala_wmc.gif
+	$tfile = pathinfo($nwsImageFile,PATHINFO_FILENAME);
+	$t = explode('_',$tfile);
+	if(isset($t[1]) and is_numeric($t[1])) {
+		$lastUpdate = $t[0].'T'.$t[1].'00Z';
+		$Status .= "<!-- last image time '$lastUpdate' -->\n";
+		return strtotime($lastUpdate);
+	} else {
+		return time();
+	}
+	
+}
+
+#-----------------------------------------------------------------------
+
 function log_status ( $fileName ) {
 	global $Status;
 	
