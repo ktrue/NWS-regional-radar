@@ -6,8 +6,8 @@
 #
 # Author:  Ken True - saratoga-weather.org
 #
-# Version 1.00 - 06-Jan-2020 - initial release
-# Version 1.01 - 12-Jan-2020 - fix issue with empty ?region= argument and last-modified 
+# Version 1.00 - 06-Jan-2021 - initial release
+# Version 1.01 - 12-Jan-2021 - fix issue with empty ?region= argument and last-modified 
 #
 # Usage:
 #   Change $NWSregion and $NWStype below to prefered settings.
