@@ -8,6 +8,7 @@
 #
 # Version 1.00 - 06-Jan-2021 - initial release
 # Version 1.01 - 12-Jan-2021 - fix issue with empty ?region= argument and last-modified 
+# Version 1.02 - 25-Jan-2021 - add error messages on not_available graphic display
 #
 # Usage:
 #   Change $NWSregion and $NWStype below to prefered settings.
@@ -42,11 +43,10 @@
 #
 $NWSregion = 'wmc'; // see below $validRegions entries for valid regions to use 
 # Note: 2 letter old $NWSregion regions will be translated to 3 letter regions
-#
-# 'ak', 'hi', 'carib' sites are not displaying data on aviationweather.gov site
+#       or use the regions in $validRegions array keys below
 #
 # Select radar type:
-$NWStype = 'rala';  // ='rala' for 'Reference at low altitude'
+$NWStype = 'cref';  // ='rala' for 'Reference at low altitude'
 #                   // ='cref' for 'Composite Reflectivity'
 #                   // ='tops-18' for 'Echo Tops - 18dbz'
 
@@ -59,7 +59,7 @@ $timeFormat = 'M d h:ia T';  // Jan 05 09:58am PST
 
 #--------------------------------------------------------------------------------
 # Constants -- don't change these
-$Version = "NWS-regional-radar-animate.php - V1.01 - 12-Jan-2021";
+$Version = "NWS-regional-radar-animate.php - V1.02 - 26-Jan-2021";
 
 $imgURL = 'https://www.aviationweather.gov';
 $queryURL = 'https://www.aviationweather.gov/radar/plot?region=%s&type=%s&date=';
@@ -450,7 +450,7 @@ function NWSRA_download_image($file_source, $file_target, $imgNum, $imgCnt, $leg
 # fetch a GIF radar image, add local timestamp, credit and legend to image and
 # save the temporary file for use by the animation routine.
 
-  global $Status,$timeFormat;
+  global $Status,$timeFormat,$NWSregion,$NWStype,$validRegions,$validTypes;
 
   $opts = array(
     'http'=>array(
@@ -494,38 +494,60 @@ function NWSRA_download_image($file_source, $file_target, $imgNum, $imgCnt, $leg
 	$light_gray = imagecolorallocate($img, 192, 192, 192);
 	$blue = imagecolorallocate($img, 0, 0, 255);
 	$black = imagecolorallocate($img, 0, 0, 0);
-
-  # add the progress bar
-	$barLen = 100; // pixels for progress bar
-	$barHeight = 10; // height of the progress bar
-	$tcnt = ($imgNum<10)?" $imgNum":"$imgNum";
-	$seqNum = "$imgNum / $imgCnt";
-	$yC = imagefontheight(3)+ 5;
-	$xC = ($img_width / 2);
-	$xBar = $xC-($barLen/2);
-	$yBar = $yC + (imagefontheight(2)/2)-2;
-	imagepolygon ($img, 
-	array ($xBar-1, $yBar-1, 
-			 $xBar+$barLen+1, $yBar-1,
-			 $xBar+$barLen+1, $yBar+$barHeight+1,
-			 $xBar-1, $yBar+$barHeight+1),
-			 4, $black);
-	$xLen = round($barLen*$imgNum/$imgCnt,0);
+	$red = imagecolorallocate($img,255,0,0);
+	$isAvailable = true;
+	if(strpos($file_source,'not_available') !==false) {
+		$isAvailable = false;
+		# write what is not available on image
+		$x = $img_width / 2;
+		$y = 7; # $img_height - ($img_height / 4);
+		$str = "region='$NWSregion' (".$validRegions[$NWSregion].") type='$NWStype' (".$validTypes[$NWStype].")";
+		imagecenteredtext($img, $x, $y, $str, 3, $red);
+		/* // looks like they started producing maps for ak, hi, carib on 26-Jan-2021
+		if( in_array($NWSregion,array('ak','hi','carib')) ) {
+			$y = $y+12;
+			$str = "Note: radar may not be provided for region=$NWSregion (".$validRegions[$NWSregion].").";
+		  imagecenteredtext($img, $x, $y, $str, 3, $red);
+		}
+		*/
+		if($NWStype !== 'rala') {
+			$y = $y+12;
+			$str = "Try changing to type='rala' (".$validTypes['rala'].") for an available map.";
+		  imagecenteredtext($img, $x, $y, $str, 3, $red);
+		}
+	}
+  if($isAvailable) {
+		# add the progress bar
+		$barLen = 100; // pixels for progress bar
+		$barHeight = 10; // height of the progress bar
+		$tcnt = ($imgNum<10)?" $imgNum":"$imgNum";
+		$seqNum = "$imgNum / $imgCnt";
+		$yC = imagefontheight(3)+ 5;
+		$xC = ($img_width / 2);
+		$xBar = $xC-($barLen/2);
+		$yBar = $yC + (imagefontheight(2)/2)-2;
+		imagepolygon ($img, 
+		array ($xBar-1, $yBar-1, 
+				 $xBar+$barLen+1, $yBar-1,
+				 $xBar+$barLen+1, $yBar+$barHeight+1,
+				 $xBar-1, $yBar+$barHeight+1),
+				 4, $black);
+		$xLen = round($barLen*$imgNum/$imgCnt,0);
+		
+		imagefilledpolygon ($img, 
+		array ($xBar, $yBar,
+		$xBar+$xLen, $yBar,
+		$xBar+$xLen, $yBar+$barHeight,
+		$xBar, $yBar+$barHeight),
+		4, $light_gray);
 	
-	imagefilledpolygon ($img, 
-	array ($xBar, $yBar,
-	$xBar+$xLen, $yBar,
-	$xBar+$xLen, $yBar+$barHeight,
-	$xBar, $yBar+$barHeight),
-	4, $light_gray);
-
-
-	$y = imagefontheight(3)+ 8;
-	#$x = ($img_width / 2) + $barLen/2 + 4;
-	$x = ($img_width / 2) - 13;
-	imagestring($img, 2, $x, $y, $seqNum, $black);
-	# end progress bar
 	
+		$y = imagefontheight(3)+ 8;
+		#$x = ($img_width / 2) + $barLen/2 + 4;
+		$x = ($img_width / 2) - 13;
+		imagestring($img, 2, $x, $y, $seqNum, $black);
+		# end progress bar
+	}
   # add the credit info
 	$y = -2;
 	$x = $img_width - 260;
@@ -731,6 +753,23 @@ function NWSRA_microtime_float()
    return ((float)$usec + (float)$sec);
 }
 
+# -------------------------------------------------------------------
+// imagecenteredtext() : text centering function for image creation
+// centers on provided x, y coordinates
+// you must pass all parameters even if you aren't using them.
+// $img = image to write upon
+// $x = x coordinate where the text will be centered
+// $y = y coordinate where the text will be centered
+// $text = the text to be written
+// $size = font size for built-in GD fonts (1,2,3,4, or 5)
+// $color = color as defined in the allocate colors section below
+function imagecenteredtext($img,$x, $y, $text, $size, $color) {
+  // if FreeType is not supported OR $font_file is set to none
+  // we'll use the GD default fonts
+       $x -= (imagefontwidth($size) * strlen($text)) / 2;
+       $y -= (imagefontheight($size)) / 2;
+       imagestring($img, $size, $x, $y - 3, $text, $color);
+} // end function imagecenteredtext
 # -------------------------------------------------------------------
 
 /*
