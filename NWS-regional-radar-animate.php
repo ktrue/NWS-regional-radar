@@ -9,6 +9,7 @@
 # Version 1.00 - 06-Jan-2021 - initial release
 # Version 1.01 - 12-Jan-2021 - fix issue with empty ?region= argument and last-modified 
 # Version 1.02 - 25-Jan-2021 - add error messages on not_available graphic display
+# Version 1.03 - 08-Feb-2021 - add cache busting headers to output
 #
 # Usage:
 #   Change $NWSregion and $NWStype below to prefered settings.
@@ -46,7 +47,7 @@ $NWSregion = 'wmc'; // see below $validRegions entries for valid regions to use
 #       or use the regions in $validRegions array keys below
 #
 # Select radar type:
-$NWStype = 'cref';  // ='rala' for 'Reference at low altitude'
+$NWStype = 'rala';  // ='rala' for 'Reference at low altitude'
 #                   // ='cref' for 'Composite Reflectivity'
 #                   // ='tops-18' for 'Echo Tops - 18dbz'
 
@@ -59,7 +60,7 @@ $timeFormat = 'M d h:ia T';  // Jan 05 09:58am PST
 
 #--------------------------------------------------------------------------------
 # Constants -- don't change these
-$Version = "NWS-regional-radar-animate.php - V1.02 - 26-Jan-2021";
+$Version = "NWS-regional-radar-animate.php - V1.03 - 08-Feb-2021";
 
 $imgURL = 'https://www.aviationweather.gov';
 $queryURL = 'https://www.aviationweather.gov/radar/plot?region=%s&type=%s&date=';
@@ -79,7 +80,7 @@ $oldRegions = array(
  'ak' => 'ak',  //Alaska
  'nw' => 'lws',  //Northwest
  'nr' => 'cod',  //Northern Rockies
- 'nm' => 'msp ',  //North Mississippi Valley
+ 'nm' => 'msp',  //North Mississippi Valley
  
  'nc' => 'dtw',  //Central Great Lakes
  'ne' => 'alb',  //Northeast
@@ -199,6 +200,7 @@ if(file_exists($RealCacheName)) {
 }
 
 $lastCacheTimeHM = gmdate("Y-m-d H:i:s",$lastCacheTime) . " UTC";
+$expiresTime     = gmdate("Y-m-d H:i:s",$lastCacheTime+$refetchSeconds) . " UTC";
 $NOWgmtHM        = gmdate("Y-m-d H:i:s",time()) . " UTC";
 $diffSecs = time() - $lastCacheTime; 
 $Status .= "<!-- now='$NOWgmtHM' page cached='$lastCacheTimeHM' ($diffSecs seconds ago) -->\n";	
@@ -267,6 +269,8 @@ if(file_exists($latestTimeFile) and file_exists($output) and ! $forceRefresh) {
 	if($latestImage == $savedFileTime) { //use cached version
 	   header('Content-type: image/gif');
 		 header('Last-modified: '.gmdate('r',NWSRA_get_time($savedFileTime)) );
+		 header('Expires: '.gmdate('r',NWSRA_get_time($savedFileTime)+$refetchSeconds) );
+		 header('Cache-Control: public, max-age='.$refetchSeconds);
 		 readfile($output);
 		 exit(0);
 	}
@@ -365,6 +369,8 @@ if($forceRefresh) {
 
   header('Content-type: image/gif');
 	header('Last-modified: '.gmdate('r',NWSRA_get_time($latestImage)) );
+	header('Expires: '.gmdate('r',NWSRA_get_time($latestImage)+$refetchSeconds) );
+	header('Cache-Control: public, max-age='.$refetchSeconds);
 	readfile($output);
 
   log_status($logFile);
